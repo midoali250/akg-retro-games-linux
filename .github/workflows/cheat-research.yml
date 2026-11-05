@@ -1,0 +1,28 @@
+name: Research exact-ROM cheat candidates
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/cheat_research.py', '.github/workflows/cheat-research.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Obtain and verify the user's ROMs privately
+        run: python scripts/package_roms.py
+      - name: Match hashes and list sourced candidates
+        run: python scripts/cheat_research.py
+      - name: Upload candidate report only, without ROMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-rom-cheat-research-candidates
+          path: cheat-research.json
+          retention-days: 14
+          if-no-files-found: error
