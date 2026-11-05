@@ -1,0 +1,48 @@
+name: Short boot probes for supplied games (Linux)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: NES
+            repo: libretro/libretro-fceumm
+            revision: e0f3086a8104f8fbbe49a2615b10401504a9533f
+            directory: .
+          - system: SNES
+            repo: libretro/snes9x
+            revision: fae2fea08f74180759ef540ee94259213f503480
+            directory: libretro
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build pinned core
+        run: |
+          git init -q core-source
+          git -C core-source remote add origin https://github.com/${{ matrix.repo }}.git
+          git -C core-source fetch --depth=1 origin ${{ matrix.revision }}
+          git -C core-source checkout --detach FETCH_HEAD
+          test "$(git -C core-source rev-parse HEAD)" = '${{ matrix.revision }}'
+          if [ -f core-source/.gitmodules ]; then git -C core-source submodule update --init --recursive; fi
+          make -C core-source/${{ matrix.directory }} -j2 platform=unix
+      - name: Run short, isolated ROM boot probes
+        shell: bash
+        run: |
+          core=$(find core-source -name '*libretro.so' -type f | head -1)
+          test -n "$core"
+          PYTHONPATH=. python tests/boot_collection.py "$core" '${{ matrix.system }}'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: boot-report-${{ matrix.system }}
+          path: boot-report-*.json
+          if-no-files-found: warn
+          retention-days: 14
