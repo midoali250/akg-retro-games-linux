@@ -1,0 +1,25 @@
+name: Test signed update publication
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/publish_signed_update.py', 'tests/test_update_publisher_flow.py', '.github/workflows/test-update-publisher.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: midoali250/bitvault-engine
+          ref: 8c3814deeeb48cf82454f5148d942cab302c2616
+          path: engine-source
+          sparse-checkout: updates/publisher/python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install cryptography==44.0.3
+      - name: Test all four platform release channels without publishing
+        run: python -m unittest discover -s tests -p 'test_update_publisher_flow.py' -v
