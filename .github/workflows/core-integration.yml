@@ -1,0 +1,52 @@
+name: Experimental libretro integration (Linux)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['libretro_host.py', 'cheat_catalog.py', 'cheats/**', 'tests/core_integration.py', '.github/workflows/core-integration.yml']
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: NES
+            repo: libretro/libretro-fceumm
+            revision: e0f3086a8104f8fbbe49a2615b10401504a9533f
+            directory: .
+            rom_id: 1TuDbnOzqjx3Z0WKKuc3zkRrLAR7F_pwf
+            rom_sha: 4377a7f5e6eb50bdd2ac6f249bf1a7085500aca8eb41f38545c3a2731c51a579
+          - name: SNES
+            repo: libretro/snes9x
+            revision: fae2fea08f74180759ef540ee94259213f503480
+            directory: libretro
+            rom_id: 1RW03OkSJ_ZC4fCc2fT84rtUGwqmng0dT
+            rom_sha: d70c9c7716ad12c674fc7dd744736aa48d4d7b4237f58066be620fda26024872
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run cheat isolation tests
+        run: python -m unittest discover -s tests -v
+      - name: Build pinned core
+        shell: bash
+        run: |
+          git init -q core-source
+          git -C core-source remote add origin https://github.com/${{ matrix.repo }}.git
+          git -C core-source fetch --depth=1 origin ${{ matrix.revision }}
+          git -C core-source checkout --detach FETCH_HEAD
+          test "$(git -C core-source rev-parse HEAD)" = '${{ matrix.revision }}'
+          if [ -f core-source/.gitmodules ]; then git -C core-source submodule update --init --recursive; fi
+          make -C core-source/${{ matrix.directory }} -j2 platform=unix
+          find core-source -name '*libretro.so' -type f -print
+      - name: Test video, audio callbacks and isolated manual state
+        shell: bash
+        run: |
+          core=$(find core-source -name '*libretro.so' -type f | head -1)
+          test -n "$core"
+          PYTHONPATH=. python tests/core_integration.py "$core" '${{ matrix.rom_id }}' '${{ matrix.rom_sha }}'
