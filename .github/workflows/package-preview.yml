@@ -12,11 +12,21 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: midoali250/bitvault-engine
+          ref: d15b63dca260556ab4d7126253fd442cf619cd87
+          path: engine-source
+          sparse-checkout: engine/desktop
+      - name: Use pinned shared BitVault frontend
+        shell: bash
+        run: |
+          cp engine-source/engine/desktop/{launcher.py,library.py,game_session.py,launch_game.py,libretro_host.py} .
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install package dependencies
-        run: python -m pip install pygame==2.6.1 pyinstaller==6.11.1 setuptools==70.3.0
+        run: python -m pip install pygame==2.6.1 pyinstaller==6.11.1 setuptools==70.3.0 pillow==11.1.0
       - name: Build engine-pinned cores and preserve upstream notices
         shell: bash
         run: |
@@ -44,11 +54,16 @@ jobs:
           PYCODE
       - name: Download and verify private game files
         run: python scripts/package_roms.py
+      - name: Generate authentic in-game thumbnails and clean icon
+        shell: bash
+        run: |
+          python engine-source/engine/desktop/thumbnail_builder.py cheats/index.json package-roms package-cores thumbnails
+          python engine-source/engine/desktop/normalize_icon.py assets/app-icon.png
       - name: Assemble self-contained preview
         run: |
           python -m PyInstaller --noconfirm --clean --onedir --contents-directory . --name AKG-Retro-Games \
             --add-data 'assets:assets' --add-data 'drive-index.json:.' --add-data 'NOTICE.md:.' \
-            --add-data 'cheats:cheats' --add-data 'package-cores:cores' --add-data 'package-roms:roms' \
+            --add-data 'cheats:cheats' --add-data 'package-cores:cores' --add-data 'package-roms:roms' --add-data 'thumbnails:thumbnails' \
             --add-data 'third-party-notices:third-party-notices' launcher.py
       - name: Verify packaged NES and SNES sessions
         shell: bash

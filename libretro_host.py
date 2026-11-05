@@ -26,7 +26,9 @@ class GameInfo(c.Structure):
 class LibretroHost:
     """One loaded core/game. Call close before creating another in the process."""
     def __init__(self, library, game, system_dir=None):
-        self.lib=c.CDLL(str(Path(library).resolve()));self.game=Path(game).resolve()
+        library=Path(library).resolve()
+        self._dll_dir=os.add_dll_directory(str(library.parent)) if os.name=='nt' else None
+        self.lib=c.CDLL(str(library));self.game=Path(game).resolve()
         self.rom=self.game.read_bytes();self.game_hash=hashlib.sha256(self.rom).hexdigest()
         if not self.rom:raise ValueError('empty game')
         self.buffer=c.create_string_buffer(self.rom);self.path_bytes=os.fsencode(str(self.game))
