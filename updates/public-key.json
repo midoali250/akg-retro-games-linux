@@ -2,5 +2,5 @@
   "algorithm": "Ed25519",
   "platform": "linux",
   "public_key_base64": "2mQzlqXHEyGBSzR9qU8A4nC0M68fRvGfiE/D3sJHEhI=",
-  "status": "key-provisioned-updater-not-integrated"
+  "status": "verification-key-pinned"
 }
