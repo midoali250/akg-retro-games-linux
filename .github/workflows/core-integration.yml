@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install pygame runtime
+        run: python -m pip install pygame==2.6.1
       - name: Run cheat isolation tests
         run: python -m unittest discover -s tests -v
       - name: Build pinned core
@@ -50,3 +52,10 @@ jobs:
           core=$(find core-source -name '*libretro.so' -type f | head -1)
           test -n "$core"
           PYTHONPATH=. python tests/core_integration.py "$core" '${{ matrix.rom_id }}' '${{ matrix.rom_sha }}'
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: session-smoke-${{ matrix.name }}
+          path: session-smoke.png
+          if-no-files-found: error
+          retention-days: 7

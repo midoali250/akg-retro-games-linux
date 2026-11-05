@@ -28,3 +28,11 @@ with tempfile.TemporaryDirectory() as temp:
         except ValueError:pass
         else:raise AssertionError('wrong-game state not rejected')
         print('PASS',host.system_name,'frames',host.frames,'video',host.width,host.height,'audio_samples',host.audio_samples,'explicit save/restore and hash isolation')
+    # Exercise the actual pygame software presentation and manual save path in CI.
+    os.environ['SDL_VIDEODRIVER']='dummy';os.environ['SDL_AUDIODRIVER']='dummy'
+    import pygame
+    from game_session import run_session
+    pygame.init();screen=pygame.display.set_mode((640,480))
+    assert run_session(screen,lib,rom,p/'manual-saves',max_frames=30,test_manual=True)=='test-complete'
+    pygame.image.save(screen,'session-smoke.png');pygame.quit()
+    print('PASS pygame game-session render, buffered audio path and manual save/load')

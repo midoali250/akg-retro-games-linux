@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import struct
 import tempfile
+from collections import deque
 
 ENV = c.CFUNCTYPE(c.c_bool, c.c_uint, c.c_void_p)
 VIDEO = c.CFUNCTYPE(None, c.c_void_p, c.c_uint, c.c_uint, c.c_size_t)
@@ -14,6 +15,12 @@ POLL = c.CFUNCTYPE(None)
 INPUT = c.CFUNCTYPE(c.c_int16, c.c_uint, c.c_uint, c.c_uint, c.c_uint)
 class SystemInfo(c.Structure):
     _fields_=[('library_name',c.c_char_p),('library_version',c.c_char_p),('valid_extensions',c.c_char_p),('need_fullpath',c.c_bool),('block_extract',c.c_bool)]
+class GameGeometry(c.Structure):
+    _fields_=[("base_width",c.c_uint),("base_height",c.c_uint),("max_width",c.c_uint),("max_height",c.c_uint),("aspect_ratio",c.c_float)]
+class SystemTiming(c.Structure):
+    _fields_=[("fps",c.c_double),("sample_rate",c.c_double)]
+class AVInfo(c.Structure):
+    _fields_=[("geometry",GameGeometry),("timing",SystemTiming)]
 class GameInfo(c.Structure):
     _fields_=[('path',c.c_char_p),('data',c.c_void_p),('size',c.c_size_t),('meta',c.c_char_p)]
 class LibretroHost:
@@ -24,7 +31,7 @@ class LibretroHost:
         if not self.rom:raise ValueError('empty game')
         self.buffer=c.create_string_buffer(self.rom);self.path_bytes=os.fsencode(str(self.game))
         self.directory_bytes=os.fsencode(str(Path(system_dir or self.game.parent).resolve()))
-        self.pixel_format=0;self.width=0;self.height=0;self.pitch=0;self.last_frame=None;self.frames=0;self.audio_samples=0;self.buttons=set();self.loaded=False;self.initialized=False
+        self.pixel_format=0;self.width=0;self.height=0;self.pitch=0;self.last_frame=None;self.frames=0;self.audio_samples=0;self.audio_queue=deque();self.audio_bytes=0;self.buttons=set();self.loaded=False;self.initialized=False
         self._callbacks=[ENV(self._environment),VIDEO(self._video),SAMPLE(self._sample),BATCH(self._batch),POLL(self._poll),INPUT(self._input)]
         L=self.lib
         for name,typ in [('retro_set_environment',ENV),('retro_set_video_refresh',VIDEO),('retro_set_audio_sample',SAMPLE),('retro_set_audio_sample_batch',BATCH),('retro_set_input_poll',POLL),('retro_set_input_state',INPUT)]:
@@ -32,6 +39,7 @@ class LibretroHost:
         L.retro_api_version.restype=c.c_uint
         if L.retro_api_version()!=1:raise RuntimeError('unsupported libretro API')
         L.retro_get_system_info.argtypes=[c.POINTER(SystemInfo)];L.retro_get_system_info.restype=None
+        L.retro_get_system_av_info.argtypes=[c.POINTER(AVInfo)];L.retro_get_system_av_info.restype=None
         L.retro_init.argtypes=[];L.retro_init.restype=None;L.retro_deinit.argtypes=[];L.retro_deinit.restype=None
         L.retro_load_game.argtypes=[c.POINTER(GameInfo)];L.retro_load_game.restype=c.c_bool
         L.retro_unload_game.argtypes=[];L.retro_unload_game.restype=None;L.retro_run.argtypes=[];L.retro_run.restype=None
@@ -47,6 +55,7 @@ class LibretroHost:
             self.info=GameInfo(self.path_bytes,None if info.need_fullpath else c.cast(self.buffer,c.c_void_p),0 if info.need_fullpath else len(self.rom),None)
             if not L.retro_load_game(c.byref(self.info)):raise RuntimeError('core rejected game')
             self.loaded=True
+            av=AVInfo();L.retro_get_system_av_info(c.byref(av));self.fps=av.timing.fps;self.sample_rate=av.timing.sample_rate
         except BaseException:
             self.close();raise
     def _environment(self,cmd,data):
@@ -65,8 +74,19 @@ class LibretroHost:
         if data and data != c.c_void_p(-1).value and width and height and 0<pitch<=65536 and height<=4096:
             self.last_frame=c.string_at(data,pitch*height);self.width=width;self.height=height;self.pitch=pitch
         self.frames+=1
-    def _sample(self,left,right):self.audio_samples+=1
-    def _batch(self,data,frames):self.audio_samples+=frames;return frames
+    def _enqueue_audio(self,data):
+        if not data:return
+        self.audio_queue.append(data);self.audio_bytes+=len(data)
+        while self.audio_bytes>524288 and self.audio_queue:
+            self.audio_bytes-=len(self.audio_queue.popleft())
+    def _sample(self,left,right):
+        self.audio_samples+=1;self._enqueue_audio(struct.pack('<hh',left,right))
+    def _batch(self,data,frames):
+        self.audio_samples+=frames
+        if data and 0<frames<=65536:self._enqueue_audio(c.string_at(data,frames*4))
+        return frames
+    def drain_audio(self):
+        data=b''.join(self.audio_queue);self.audio_queue.clear();self.audio_bytes=0;return data
     def _poll(self):pass
     def _input(self,port,device,index,ident):return int(port==0 and device==1 and index==0 and ident in self.buttons)
     def run_frame(self):
