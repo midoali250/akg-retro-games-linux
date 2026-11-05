@@ -1,0 +1,82 @@
+name: Build private playable Linux preview
+on:
+  push:
+    branches: [main]
+    paths: ['launcher.py', 'game_session.py', 'launch_game.py', 'libretro_host.py', 'cheats/**', 'drive-index.json', 'engine-reference.json', 'scripts/package_roms.py', '.github/workflows/package-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package dependencies
+        run: python -m pip install pygame==2.6.1 pyinstaller==6.11.1
+      - name: Build engine-pinned cores and preserve upstream notices
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          import json,urllib.request,subprocess,os,pathlib,shutil
+          ref=json.load(open('engine-reference.json'))
+          with urllib.request.urlopen('https://raw.githubusercontent.com/midoali250/bitvault-engine/'+ref['commit']+'/'+ref['registry'],timeout=30) as r:registry=json.load(r)
+          pathlib.Path('package-cores').mkdir();pathlib.Path('third-party-notices').mkdir()
+          for system in ('NES','SNES'):
+              found=[c for c in registry['cores'] if c['system']==system]
+              assert len(found)==1;c=found[0];dest='source-'+system
+              subprocess.run(['git','init','-q',dest],check=True)
+              subprocess.run(['git','-C',dest,'remote','add','origin','https://github.com/'+c['repository']+'.git'],check=True)
+              subprocess.run(['git','-C',dest,'fetch','--depth=1','origin',c['revision']],check=True)
+              subprocess.run(['git','-C',dest,'checkout','--detach','FETCH_HEAD'],check=True)
+              assert subprocess.check_output(['git','-C',dest,'rev-parse','HEAD'],text=True).strip()==c['revision']
+              if pathlib.Path(dest,'.gitmodules').exists():subprocess.run(['git','-C',dest,'submodule','update','--init','--recursive'],check=True)
+              subprocess.run(['make','-C',str(pathlib.Path(dest,c['make_dir'])),'-f',c['makefile'],'-j2','platform=unix'],check=True)
+              libs=list(pathlib.Path(dest).rglob('*libretro.so'));assert len(libs)==1,libs
+              shutil.copy2(libs[0],pathlib.Path('package-cores')/libs[0].name)
+              notices=[p for p in pathlib.Path(dest).iterdir() if p.is_file() and (p.name.upper().startswith(('LICENSE','COPYING')))]
+              if not notices:raise RuntimeError('upstream license missing: '+system)
+              for p in notices:shutil.copy2(p,pathlib.Path('third-party-notices')/(system+'-'+p.name))
+              pathlib.Path('third-party-notices',system+'-source.txt').write_text(c['repository']+' @ '+c['revision']+'\n')
+          PYCODE
+      - name: Download and verify private game files
+        run: python scripts/package_roms.py
+      - name: Assemble self-contained preview
+        run: |
+          python -m PyInstaller --noconfirm --clean --onedir --contents-directory . --name AKG-Retro-Games \
+            --add-data 'assets:assets' --add-data 'drive-index.json:.' --add-data 'NOTICE.md:.' \
+            --add-data 'cheats:cheats' --add-data 'package-cores:cores' --add-data 'package-roms:roms' \
+            --add-data 'third-party-notices:third-party-notices' launcher.py
+      - name: Verify packaged NES and SNES sessions
+        shell: bash
+        run: |
+          export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
+          export HOME="$(mktemp -d)"
+          dist/AKG-Retro-Games/AKG-Retro-Games --smoke
+          dist/AKG-Retro-Games/AKG-Retro-Games --smoke --ci-game-id 1TuDbnOzqjx3Z0WKKuc3zkRrLAR7F_pwf
+          dist/AKG-Retro-Games/AKG-Retro-Games --smoke --ci-game-id 1RW03OkSJ_ZC4fCc2fT84rtUGwqmng0dT
+      - name: Package portable AppImage
+        shell: bash
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp -a dist/AKG-Retro-Games/. AppDir/usr/bin/
+          cp assets/app-icon.png AppDir/akg-retro-games.png
+          printf '[Desktop Entry]\nType=Application\nName=AKG Retro Games Preview\nExec=AKG-Retro-Games\nIcon=akg-retro-games\nCategories=Game;Emulator;\nTerminal=false\n' > AppDir/akg-retro-games.desktop
+          printf '#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/bin/AKG-Retro-Games" "$@"\n' > AppDir/AppRun
+          chmod +x AppDir/AppRun
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          echo '62aebc77c2149e96b593b94da9bbd1881e0984a56399ff6d7a03b7ddd7c9ce68  appimagetool' | sha256sum -c -
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir AKG-Retro-Games-Linux-x86_64-preview.AppImage
+          sha256sum AKG-Retro-Games-Linux-x86_64-preview.AppImage > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AKG-Retro-Games-Linux-playable-preview
+          path: |
+            AKG-Retro-Games-Linux-x86_64-preview.AppImage
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

@@ -71,10 +71,19 @@ def render(screen, games, category, query, chosen, favorites, status, about=Fals
         label('Press I or ESC to return',205,575,(113,206,224),small)
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--smoke',action='store_true');p.add_argument('--screenshot');p.add_argument('--rom-dir',default=str(ROOT/'roms'));p.add_argument('--cores-dir',default=str(ROOT/'cores'));args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--smoke',action='store_true');p.add_argument('--screenshot');p.add_argument('--rom-dir',default=str(ROOT/'roms'));p.add_argument('--cores-dir',default=str(ROOT/'cores'));p.add_argument('--ci-game-id',help=argparse.SUPPRESS);args=p.parse_args()
     pygame.init();pygame.joystick.init();screen=pygame.display.set_mode((1280,720),0 if args.smoke else pygame.FULLSCREEN);pygame.display.set_caption('AKG Retro Games — preview')
     pygame.display.set_icon(pygame.image.load(str(ROOT/'assets/app-icon.png')))
-    all_games=load_catalog(ROOT/'drive-index.json');favorites=set();cat=0;query='';chosen=0;search=False;about=False; joysticks=[]; status='Experimental: games and cores are not bundled yet';running=True;clock=pygame.time.Clock()
+    all_games=load_catalog(ROOT/'drive-index.json');favorites=set();cat=0;query='';chosen=0;search=False;about=False; joysticks=[]; status='Experimental build — game support is being tested';running=True;clock=pygame.time.Clock()
+    if args.ci_game_id:
+        if not args.smoke:raise ValueError('CI game test requires smoke mode')
+        from launch_game import launch_game
+        games=[game for game in all_games if game['id']==args.ci_game_id]
+        if len(games)!=1:raise ValueError('CI game ID not found')
+        result=launch_game(games[0],screen,args.cores_dir,args.rom_dir,Path.home()/'.retro-collection'/'manual-saves',max_frames=24,test_manual=True)
+        pygame.quit()
+        if result!='test-complete':raise RuntimeError('CI game session failed')
+        return
     for n in range(pygame.joystick.get_count()):
         try:
             j=pygame.joystick.Joystick(n);j.init();joysticks.append(j)
