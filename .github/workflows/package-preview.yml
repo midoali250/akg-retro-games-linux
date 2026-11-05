@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install package dependencies
-        run: python -m pip install pygame==2.6.1 pyinstaller==6.11.1
+        run: python -m pip install pygame==2.6.1 pyinstaller==6.11.1 setuptools==70.3.0
       - name: Build engine-pinned cores and preserve upstream notices
         shell: bash
         run: |
