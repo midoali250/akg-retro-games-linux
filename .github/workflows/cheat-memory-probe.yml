@@ -1,0 +1,33 @@
+name: Verify NES cheat memory candidates
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/probe_cheats.py', '.github/workflows/cheat-memory-probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build exact pinned NES core
+        run: |
+          git init -q core
+          git -C core remote add origin https://github.com/libretro/libretro-fceumm.git
+          git -C core fetch --depth=1 origin e0f3086a8104f8fbbe49a2615b10401504a9533f
+          git -C core checkout --detach FETCH_HEAD
+          test "$(git -C core rev-parse HEAD)" = e0f3086a8104f8fbbe49a2615b10401504a9533f
+          make -C core -j2 platform=unix
+      - name: Probe matched game codes in isolated processes
+        run: python scripts/probe_cheats.py --core core/fceumm_libretro.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nes-cheat-memory-probe
+          path: cheat-memory-probe.json
+          retention-days: 14
+          if-no-files-found: error
