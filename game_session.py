@@ -16,6 +16,14 @@ def frame_surface(host):
     masks=(0x00ff0000,0x0000ff00,0x000000ff,0) if bpp==4 else ((0xf800,0x07e0,0x001f,0) if host.pixel_format==2 else (0x7c00,0x03e0,0x001f,0))
     frame=pygame.Surface((host.width,host.height),0,bpp*8,masks);frame.get_buffer().write(data);return frame
 
+def fit_frame(frame_size, screen_size):
+    """Center an uncropped frame in the available display using square pixels."""
+    fw,fh=frame_size;sw,sh=screen_size
+    if min(fw,fh,sw,sh)<=0:raise ValueError('invalid frame or screen size')
+    scale=min(sw/fw,sh/fh)
+    w=max(1,min(sw,round(fw*scale)));h=max(1,min(sh,round(fh*scale)))
+    return pygame.Rect((sw-w)//2,(sh-h)//2,w,h)
+
 def input_bits(joysticks):
     pressed=pygame.key.get_pressed();bits={b for k,b in KEYS.items() if pressed[k]}
     for j in joysticks:
@@ -69,8 +77,11 @@ def run_session(screen, core_path, rom_path, state_dir, max_frames=None, test_ma
             if test_manual and count==20:core.load_state(state)
             frame=frame_surface(core)
             if frame:
-                # Full screen without cropping; aspect may stretch. This is upscaling, not native 4K.
-                screen.blit(pygame.transform.scale(frame,screen.get_size()),(0,0))
+                # Fit the full frame without cropping or stretching; add letterboxing.
+                # This is upscaling, not native 4K.
+                target=fit_frame(frame.get_size(),screen.get_size())
+                screen.fill((0,0,0))
+                screen.blit(pygame.transform.scale(frame,target.size),target.topleft)
             pcm=core.drain_audio()
             if sound and pcm and (not sound.get_busy() or sound.get_queue() is None):
                 try:

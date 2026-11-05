@@ -10,3 +10,5 @@ The Linux menu has an **experimental** selection path for locally supplied, hash
 
 ## Engine foundation
 The experimental engine registry is pinned to `midoali250/bitvault-engine` commit `4eb0473490357c1fc8b8d86af4e4f794632b9746` on `engine/clean-foundation`. NES and SNES use the registry's FCEUmm and Snes9x revisions. The engine registry is a build-probe foundation, not a finished cross-platform player. No ROMs are bundled.
+
+The experimental display fits the full frame to the screen with letterboxing instead of stretching or cropping; it is upscaling, not native 4K. The current calculation assumes square pixels, not a calibrated console pixel aspect ratio.

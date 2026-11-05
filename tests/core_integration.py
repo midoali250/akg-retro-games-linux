@@ -31,7 +31,10 @@ with tempfile.TemporaryDirectory() as temp:
     # Exercise the actual pygame software presentation and manual save path in CI.
     os.environ['SDL_VIDEODRIVER']='dummy';os.environ['SDL_AUDIODRIVER']='dummy'
     import pygame
-    from game_session import run_session
+    from game_session import run_session, fit_frame
+    r=fit_frame((256,240),(3840,2160))
+    assert r.height==2160 and r.width==2304 and r.left==768
+    assert fit_frame((320,240),(1920,1080)).size==(1440,1080)
     pygame.init();screen=pygame.display.set_mode((640,480))
     assert run_session(screen,lib,rom,p/'manual-saves',max_frames=30,test_manual=True)=='test-complete'
     pygame.image.save(screen,'session-smoke.png');pygame.quit()
