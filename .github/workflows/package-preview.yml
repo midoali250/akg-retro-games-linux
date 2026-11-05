@@ -62,7 +62,7 @@ jobs:
       - name: Assemble self-contained preview
         run: |
           python -m PyInstaller --noconfirm --clean --onedir --contents-directory . --name AKG-Retro-Games \
-            --add-data 'assets:assets' --add-data 'drive-index.json:.' --add-data 'NOTICE.md:.' \
+            --add-data 'updates/public-key.json:updates' --add-data 'assets:assets' --add-data 'drive-index.json:.' --add-data 'NOTICE.md:.' \
             --add-data 'cheats:cheats' --add-data 'package-cores:cores' --add-data 'package-roms:roms' --add-data 'thumbnails:thumbnails' \
             --add-data 'third-party-notices:third-party-notices' launcher.py
       - name: Verify packaged NES and SNES sessions
