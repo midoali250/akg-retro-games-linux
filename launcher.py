@@ -71,10 +71,10 @@ def render(screen, games, category, query, chosen, favorites, status, about=Fals
         label('Press I or ESC to return',205,575,(113,206,224),small)
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--smoke',action='store_true');p.add_argument('--screenshot');args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--smoke',action='store_true');p.add_argument('--screenshot');p.add_argument('--rom-dir',default=str(ROOT/'roms'));p.add_argument('--cores-dir',default=str(ROOT/'cores'));args=p.parse_args()
     pygame.init();pygame.joystick.init();screen=pygame.display.set_mode((1280,720),0 if args.smoke else pygame.FULLSCREEN);pygame.display.set_caption('Retro Collection — preview')
     pygame.display.set_icon(pygame.image.load(str(ROOT/'assets/app-icon.png')))
-    all_games=load_catalog(ROOT/'drive-index.json');favorites=set();cat=0;query='';chosen=0;search=False;about=False; joysticks=[]; status='Preview only: game execution is not implemented';running=True;clock=pygame.time.Clock()
+    all_games=load_catalog(ROOT/'drive-index.json');favorites=set();cat=0;query='';chosen=0;search=False;about=False; joysticks=[]; status='Experimental: games and cores are not bundled yet';running=True;clock=pygame.time.Clock()
     for n in range(pygame.joystick.get_count()):
         try:
             j=pygame.joystick.Joystick(n);j.init();joysticks.append(j)
@@ -118,7 +118,13 @@ def main():
                 elif event.key==pygame.K_UP:chosen=max(0,chosen-3)
                 elif event.key==pygame.K_f and games:
                     ident=games[chosen]['id'];favorites.symmetric_difference_update({ident})
-                elif event.key==pygame.K_RETURN:status='Preview only: game execution is not implemented'
+                elif event.key==pygame.K_RETURN and games:
+                    try:
+                        from launch_game import launch_game
+                        result=launch_game(games[chosen],screen,args.cores_dir,args.rom_dir,Path.home()/'.retro-collection'/'manual-saves')
+                        if result=='quit':running=False
+                        status='Returned from game'
+                    except (OSError,RuntimeError,ValueError) as err:status=str(err)[:110]
         render(screen,games,CATEGORIES[cat],query,chosen,favorites,status,about);pygame.display.flip()
         if args.screenshot:pygame.image.save(screen,args.screenshot)
         if args.smoke:running=False

@@ -5,3 +5,5 @@ PRIVATE, INCOMPLETE FOUNDATION. This repository contains the selected menu conce
 Future updates are intended to use an externally hosted distribution service; no developer token may be embedded in the client. SHA-256 alone does not authenticate a catalog: a trusted signed manifest or equivalent trust mechanism is still required before shipping. Android package signing is separate from update metadata signing.
 
 Developer attribution and disclaimer: [NOTICE.md](NOTICE.md). Platform icon assets are in `assets/platform-icons/`; application integration is not yet implemented.
+
+The Linux menu has an **experimental** selection path for locally supplied, hash-matched ROMs and locally compiled cores (`--rom-dir` and `--cores-dir`). Nothing is bundled yet, no player release is available, and this is not a finished application. F5/F8 perform explicit manual save/load. CI headless probes do not replace actual device, sound, controller or full-playthrough testing.

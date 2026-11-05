@@ -36,3 +36,17 @@ with tempfile.TemporaryDirectory() as temp:
     assert run_session(screen,lib,rom,p/'manual-saves',max_frames=30,test_manual=True)=='test-complete'
     pygame.image.save(screen,'session-smoke.png');pygame.quit()
     print('PASS pygame game-session render, buffered audio path and manual save/load')
+    # Verify the catalog selection path uses the right core and exact ROM identity.
+    import shutil
+    from launch_game import launch_game
+    pygame.init();screen=pygame.display.set_mode((640,480))
+    romdir=p/'collection-roms';romdir.mkdir();coredir=p/'collection-cores';coredir.mkdir()
+    system='NES' if data.startswith(b'NES\x1a') else 'SNES'
+    ext='.nes' if system=='NES' else '.smc';core_name='fceumm_libretro.so' if system=='NES' else 'snes9x_libretro.so'
+    selected=romdir/(file_id+ext);selected.write_bytes(data);shutil.copy2(lib,coredir/core_name)
+    assert launch_game({'id':file_id},screen,coredir,romdir,p/'collection-save',max_frames=24,test_manual=True)=='test-complete'
+    selected.write_bytes(data+b'wrong')
+    try:launch_game({'id':file_id},screen,coredir,romdir,p/'collection-save',max_frames=1)
+    except ValueError:pass
+    else:raise AssertionError('wrong ROM accepted for catalog entry')
+    pygame.quit();print('PASS game selection, correct core, ROM identity, manual state')

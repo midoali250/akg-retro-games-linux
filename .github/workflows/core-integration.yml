@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['libretro_host.py', 'cheat_catalog.py', 'cheats/**', 'tests/core_integration.py', '.github/workflows/core-integration.yml']
+    paths: ['libretro_host.py', 'game_session.py', 'launch_game.py', 'cheat_catalog.py', 'cheats/**', 'tests/core_integration.py', '.github/workflows/core-integration.yml']
 permissions:
   contents: read
 jobs:
