@@ -24,6 +24,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Verify cores against pinned BitVault Engine registry
+        env:
+          CORE_SYSTEM: ${{ matrix.system }}
+          CORE_REPO: ${{ matrix.repo }}
+          CORE_REVISION: ${{ matrix.revision }}
+          CORE_DIRECTORY: ${{ matrix.directory }}
+        run: |
+          python - <<'PYCODE'
+          import json,os,urllib.request
+          ref=json.load(open('engine-reference.json'))
+          url='https://raw.githubusercontent.com/midoali250/bitvault-engine/'+ref['commit']+'/'+ref['registry']
+          with urllib.request.urlopen(url,timeout=30) as response: registry=json.load(response)
+          matches=[c for c in registry['cores'] if c['system']==os.environ['CORE_SYSTEM']]
+          assert len(matches)==1, 'Engine registry system missing or ambiguous'
+          c=matches[0]
+          assert (c['repository'],c['revision'],c['make_dir']) == (os.environ['CORE_REPO'],os.environ['CORE_REVISION'],os.environ['CORE_DIRECTORY']), 'Core differs from pinned engine registry'
+          print('Engine registry verified:',c['system'],c['name'],c['revision'])
+          PYCODE
       - name: Build pinned core
         run: |
           git init -q core-source
