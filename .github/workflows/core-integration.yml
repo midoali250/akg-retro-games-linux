@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['libretro_host.py', 'game_session.py', 'launch_game.py', 'cheat_catalog.py', 'cheats/**', 'engine-reference.json', 'tests/core_integration.py', '.github/workflows/core-integration.yml']
+    paths: ['libretro_host.py', 'game_session.py', 'launch_game.py', 'cheat_catalog.py', 'cheats/**', 'engine-reference.json', 'tests/core_integration.py', 'tests/verify_smw_cheat.py', '.github/workflows/core-integration.yml']
 permissions:
   contents: read
 jobs:
@@ -70,6 +70,12 @@ jobs:
           core=$(find core-source -name '*libretro.so' -type f | head -1)
           test -n "$core"
           PYTHONPATH=. python tests/core_integration.py "$core" '${{ matrix.rom_id }}' '${{ matrix.rom_sha }}'
+      - name: Probe sourced Super Mario World cheat against exact ROM
+        if: matrix.name == 'SNES'
+        shell: bash
+        run: |
+          core=$(find core-source -name '*libretro.so' -type f | head -1)
+          PYTHONPATH=. python tests/verify_smw_cheat.py "$core"
       - uses: actions/upload-artifact@v4
         if: success()
         with:
