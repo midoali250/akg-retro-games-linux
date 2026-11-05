@@ -12,8 +12,12 @@ def gh(*args):return subprocess.check_output(['gh',*args],text=True,timeout=300)
 run_info=json.loads(gh('api','repos/'+repo+'/actions/runs/'+run))
 if run_info['status']!='completed' or run_info['conclusion']!='success' or run_info['repository']['full_name']!=repo:raise SystemExit('Build run is not successful for this repository')
 head=run_info['head_sha']
-existing=subprocess.run(['gh','release','view',tag,'--repo',repo],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-if existing.returncode==0:raise SystemExit('Release tag already exists; will not overwrite it')
+existing=subprocess.run(['gh','release','view',tag,'--repo',repo,'--json','isDraft,body,assets'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+use_draft=False
+if existing.returncode==0:
+ release=json.loads(existing.stdout);marker='AKG-AUTHORIZED-REVIEW-BUILD-'+run
+ if platform!='linux' or not release['isDraft'] or marker not in release['body'] or release['assets']:raise SystemExit('Release already exists; refusing to overwrite it')
+ use_draft=True
 name,ext=artifacts[platform]
 with tempfile.TemporaryDirectory(prefix='akg-review-') as t:
  gh('run','download',run,'--repo',repo,'--name',name,'--dir',t)
@@ -24,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix='akg-review-') as t:
  checksum=Path(t)/'AKG-SHA256.txt';checksum.write_text(digest+'  '+asset.name+'\n')
  warnings={'android':'Signed Android review APK. The previous debug-signed preview cannot be upgraded in-place; uninstalling it may remove its local saves. Android 8 or newer; arm64 or x86_64.', 'windows':'Windows x64 portable executable. The application is unsigned.', 'linux':'Linux x86_64 AppImage. The application is unsigned.', 'macos':'macOS Apple Silicon application ZIP. It is unsigned and not notarized.'}[platform]
  notes=('Playable review build, not a final release. Not all cheats and stage selection are validated. '+warnings+' The update channel has not been tested end-to-end on a real published update; desktop installs are manual. Source commit '+head+'; verified GitHub Actions run '+str(run)+'. Release assets do not expire automatically.')
- gh('release','create',tag,'--repo',repo,'--target',head,'--title','AKG Retro Games — '+platform+' review','--notes',notes,'--draft','--prerelease')
+ if not use_draft:gh('release','create',tag,'--repo',repo,'--target',head,'--title','AKG Retro Games — '+platform+' review','--notes',notes,'--draft','--prerelease')
  gh('release','upload',tag,str(asset),str(checksum),'--repo',repo)
  gh('release','edit',tag,'--repo',repo,'--draft=false')
  release=json.loads(gh('release','view',tag,'--repo',repo,'--json','url,assets'))
