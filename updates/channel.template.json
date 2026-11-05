@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "product": "akg-retro-games",
+  "platform": "linux",
+  "package_format": "appimage",
+  "channel": "stable",
+  "feed_url": null,
+  "publisher_public_key": null,
+  "status": "not-configured"
+}
