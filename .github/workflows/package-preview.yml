@@ -2,7 +2,7 @@ name: Build private playable Linux preview
 on:
   push:
     branches: [main]
-    paths: ['launcher.py', 'game_session.py', 'launch_game.py', 'libretro_host.py', 'cheats/**', 'drive-index.json', 'engine-reference.json', 'scripts/package_roms.py', '.github/workflows/package-preview.yml']
+    paths: ['updates/version.json', 'updates/public-key.json', 'launcher.py', 'game_session.py', 'launch_game.py', 'libretro_host.py', 'cheats/**', 'drive-index.json', 'engine-reference.json', 'scripts/package_roms.py', '.github/workflows/package-preview.yml']
   workflow_dispatch:
 permissions:
   contents: read
