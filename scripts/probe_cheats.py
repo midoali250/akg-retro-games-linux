@@ -5,6 +5,7 @@ memory enforcement from proof that a named gameplay effect really occurs.
 """
 import argparse,concurrent.futures,ctypes,hashlib,json,re,subprocess,sys,tempfile,urllib.request
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from libretro_host import LibretroHost
 PATTERN=re.compile(r'00[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}')
 PRIORITY=re.compile(r'infinite|invincib|health|lives|ammo|energy',re.I)
